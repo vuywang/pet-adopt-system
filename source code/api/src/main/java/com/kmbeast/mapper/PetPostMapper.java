@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kmbeast.pojo.dto.PetPostQueryDto;
 import com.kmbeast.pojo.entity.PetPost;
 import com.kmbeast.pojo.vo.PetPostListItemVO;
+import com.kmbeast.pojo.vo.PetPostRecommendCandidateVO;
 import com.kmbeast.pojo.vo.PetPostSelectedVO;
 import com.kmbeast.pojo.vo.PetPostVO;
 import org.apache.ibatis.annotations.Mapper;
@@ -54,5 +55,12 @@ public interface PetPostMapper extends BaseMapper<PetPost> {
     List<PetPostListItemVO> queryListItemByIds(@Param(value = "ids") List<Integer> ids);
 
     List<PetPostSelectedVO> querySelectedVO(@Param(value = "userId") Integer userId);
+
+    /**
+     * 查询内容推荐所需的帖子特征
+     *
+     * @return 候选项列表
+     */
+    List<PetPostRecommendCandidateVO> queryRecommendCandidates();
 
 }

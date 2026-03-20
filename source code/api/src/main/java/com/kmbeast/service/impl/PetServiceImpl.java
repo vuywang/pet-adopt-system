@@ -13,18 +13,22 @@ import com.kmbeast.pojo.em.IsRecommendEnum;
 import com.kmbeast.pojo.entity.ActiveNet;
 import com.kmbeast.pojo.entity.Pet;
 import com.kmbeast.pojo.vo.PetListItemVO;
+import com.kmbeast.pojo.vo.PetRecommendCandidateVO;
 import com.kmbeast.pojo.vo.PetVO;
 import com.kmbeast.pojo.vo.ScoreVO;
 import com.kmbeast.service.PetService;
 import com.kmbeast.utils.AssertUtils;
-import com.kmbeast.utils.UserBasedCFUtil;
+import com.kmbeast.utils.ContentBasedRecommendUtil;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -178,21 +182,14 @@ public class PetServiceImpl implements PetService {
      */
     @Override
     public Result<List<PetListItemVO>> autoRecommend(Integer count) {
-        List<Integer> petIds = petMapper.queryAllIds(); // 获取全部的宠物ID列表
-        // 兴趣评分 = 浏览 * 1 + 收藏 * 3 + 喜欢 * 1
-        List<ScoreVO> scoreVOS = activeNetMapper.queryScore("PET");
-        // 期望用到的评分数据集
-        List<UserBasedCFUtil.Score> scoreList = scoreVOS.stream().map(scoreVO -> new UserBasedCFUtil.Score(
-                scoreVO.getUserId(),
-                scoreVO.getContentId(),
-                scoreVO.getScore()
-        )).collect(Collectors.toList());
-        // 构建用户对于物品评分的矩阵
-        Map<Integer, Map<Integer, Double>> userItemMatrix = UserBasedCFUtil.buildUserItemMatrix(petIds, scoreList);
-        UserBasedCFUtil userBasedCFUtil = new UserBasedCFUtil(userItemMatrix);
-        List<Integer> recommendItems = userBasedCFUtil.recommendItems(LocalThreadHolder.getUserId(), count);
+        // 内容推荐依赖用户已有行为来构建兴趣画像，这里直接复用现有行为表。
+        ActiveNetQueryDto activeNetQueryDto = new ActiveNetQueryDto();
+        activeNetQueryDto.setUserId(LocalThreadHolder.getUserId());
+        activeNetQueryDto.setContentType("PET");
+        List<ActiveNet> activeNetList = activeNetMapper.query(activeNetQueryDto);
+        List<Integer> recommendItems = buildPetContentRecommendations(activeNetList, count);
         System.out.println("为用户「" + LocalThreadHolder.getUserId() + "」推荐的宠物ID列表: " + recommendItems);
-        // “冷启动”
+        // 内容推荐算不出结果时，保留现有热门浏览兜底逻辑。
         if (recommendItems.isEmpty()) {
             List<ScoreVO> scoreVOList = activeNetMapper.queryAllIds(
                     "PET",
@@ -205,10 +202,10 @@ public class PetServiceImpl implements PetService {
             List<Integer> petNetIds = scoreVOList.stream()
                     .map(ScoreVO::getContentId)
                     .collect(Collectors.toList());
-            List<PetListItemVO> petListItemVOS = petMapper.queryListItemByIds(petNetIds);
+            List<PetListItemVO> petListItemVOS = filterAvailablePets(petMapper.queryListItemByIds(petNetIds), count);
             return ApiResult.success(petListItemVOS);
         }
-        List<PetListItemVO> petListItemVOS = petMapper.queryListItemByIds(recommendItems);
+        List<PetListItemVO> petListItemVOS = filterAvailablePets(petMapper.queryListItemByIds(recommendItems), count);
         return ApiResult.success(petListItemVOS);
     }
 
@@ -233,5 +230,69 @@ public class PetServiceImpl implements PetService {
                 .collect(Collectors.toList());
         List<PetListItemVO> petListItemVOS = petMapper.queryListItemByIds(petIds);
         return ApiResult.success(petListItemVOS);
+    }
+
+    /**
+     * 基于内容特征推荐宠物
+     */
+    private List<Integer> buildPetContentRecommendations(List<ActiveNet> activeNetList, Integer count) {
+        if (activeNetList == null || activeNetList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 先把全部候选宠物转成特征向量，后续会和用户画像做相似度计算。
+        Map<Integer, PetRecommendCandidateVO> candidateMap = petMapper.queryRecommendCandidates().stream()
+                .filter(item -> !Boolean.TRUE.equals(item.getIsAdopt()))
+                .collect(Collectors.toMap(PetRecommendCandidateVO::getId, item -> item));
+        Map<Integer, Map<String, Double>> itemVectors = new HashMap<>();
+        candidateMap.forEach((itemId, candidate) -> itemVectors.put(itemId, buildPetFeatureVector(candidate)));
+        // 用户画像由历史交互过的宠物特征累加得到，收藏和点赞会比浏览权重更高。
+        Map<Integer, Double> interactionWeights = aggregateInteractionWeights(activeNetList);
+        Map<String, Double> userProfile = ContentBasedRecommendUtil.buildUserProfile(itemVectors, interactionWeights);
+        Set<Integer> excludeIds = new HashSet<>(interactionWeights.keySet());
+        return ContentBasedRecommendUtil.rankItems(itemVectors, userProfile, excludeIds, count);
+    }
+
+    /**
+     * 构建单只宠物的内容特征
+     */
+    private Map<String, Double> buildPetFeatureVector(PetRecommendCandidateVO candidate) {
+        Map<String, Double> vector = new HashMap<>();
+        // 结构化字段权重更高，用来稳定推荐方向。
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "petType", candidate.getPetTypeId(), 3D);
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "petTypeName", candidate.getPetTypeName(), 2D);
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "gender", candidate.getGender(), 1.5D);
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "vaccine", candidate.getIsVaccine(), 1.5D);
+        ContentBasedRecommendUtil.addBucketFeature(vector, "age", candidate.getAge(), 1.5D);
+        // 文本字段负责补充细粒度语义，例如地区、标题词和描述词。
+        ContentBasedRecommendUtil.addTextFeatures(vector, "name", candidate.getName(), 2D);
+        ContentBasedRecommendUtil.addTextFeatures(vector, "address", candidate.getAddress(), 1.5D);
+        ContentBasedRecommendUtil.addTextFeatures(vector, "detail", candidate.getDetail(), 1D);
+        return vector;
+    }
+
+    /**
+     * 聚合用户对宠物的行为强度
+     */
+    private Map<Integer, Double> aggregateInteractionWeights(List<ActiveNet> activeNetList) {
+        Map<Integer, Double> weights = new HashMap<>();
+        for (ActiveNet activeNet : activeNetList) {
+            double behaviorWeight = ContentBasedRecommendUtil.behaviorWeight(activeNet.getType());
+            if (behaviorWeight <= 0) {
+                continue;
+            }
+            weights.merge(activeNet.getContentId(), behaviorWeight, Double::sum);
+        }
+        return weights;
+    }
+
+    /**
+     * 过滤掉已经领养的宠物，避免兜底阶段把无效内容继续推荐给用户
+     */
+    private List<PetListItemVO> filterAvailablePets(List<PetListItemVO> pets, Integer count) {
+        int limit = count == null || count <= 0 ? pets.size() : count;
+        return pets.stream()
+                .filter(pet -> !Boolean.TRUE.equals(pet.getIsAdopt()))
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 }

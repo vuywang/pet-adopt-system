@@ -3,6 +3,7 @@ package com.kmbeast.mapper;
 import com.kmbeast.pojo.dto.PetQueryDto;
 import com.kmbeast.pojo.entity.Pet;
 import com.kmbeast.pojo.vo.PetListItemVO;
+import com.kmbeast.pojo.vo.PetRecommendCandidateVO;
 import com.kmbeast.pojo.vo.PetVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -62,7 +63,13 @@ public interface PetMapper {
 
     List<Integer> queryAllIds();
 
-
     List<PetListItemVO> queryListItemByIds(@Param(value = "ids") List<Integer> recommendItems);
+
+    /**
+     * 查询内容推荐所需的宠物特征
+     *
+     * @return 候选项列表
+     */
+    List<PetRecommendCandidateVO> queryRecommendCandidates();
 
 }

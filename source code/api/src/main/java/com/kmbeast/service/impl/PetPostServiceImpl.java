@@ -13,20 +13,24 @@ import com.kmbeast.pojo.em.IsAuditEnum;
 import com.kmbeast.pojo.entity.ActiveNet;
 import com.kmbeast.pojo.entity.PetPost;
 import com.kmbeast.pojo.vo.PetPostListItemVO;
+import com.kmbeast.pojo.vo.PetPostRecommendCandidateVO;
 import com.kmbeast.pojo.vo.PetPostSelectedVO;
 import com.kmbeast.pojo.vo.PetPostVO;
 import com.kmbeast.pojo.vo.ScoreVO;
 import com.kmbeast.service.PetPostService;
 import com.kmbeast.utils.AssertUtils;
-import com.kmbeast.utils.UserBasedCFUtil;
+import com.kmbeast.utils.ContentBasedRecommendUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -142,21 +146,14 @@ public class PetPostServiceImpl extends ServiceImpl<PetPostMapper, PetPost> impl
      */
     @Override
     public Result<List<PetPostListItemVO>> autoRecommend(Integer count) {
-        List<Integer> petPostIds = this.baseMapper.queryAllIds(); // 获取全部的宠物经验ID列表
-        // 兴趣评分 = 浏览 * 1 + 收藏 * 3 + 喜欢 * 1
-        List<ScoreVO> scoreVOS = activeNetMapper.queryScore("PET-POST");
-        // 期望用到的评分数据集
-        List<UserBasedCFUtil.Score> scoreList = scoreVOS.stream().map(scoreVO -> new UserBasedCFUtil.Score(
-                scoreVO.getUserId(),
-                scoreVO.getContentId(),
-                scoreVO.getScore()
-        )).collect(Collectors.toList());
-        // 构建用户对于物品评分的矩阵
-        Map<Integer, Map<Integer, Double>> userItemMatrix = UserBasedCFUtil.buildUserItemMatrix(petPostIds, scoreList);
-        UserBasedCFUtil userBasedCFUtil = new UserBasedCFUtil(userItemMatrix);
-        List<Integer> recommendItems = userBasedCFUtil.recommendItems(LocalThreadHolder.getUserId(), count);
+        // 帖子推荐同样改成内容推荐，只是内容特征来自标题、摘要、正文和宠物类别。
+        ActiveNetQueryDto activeNetQueryDto = new ActiveNetQueryDto();
+        activeNetQueryDto.setUserId(LocalThreadHolder.getUserId());
+        activeNetQueryDto.setContentType("PET-POST");
+        List<ActiveNet> activeNetList = activeNetMapper.query(activeNetQueryDto);
+        List<Integer> recommendItems = buildPetPostContentRecommendations(activeNetList, count);
         System.out.println("为用户「" + LocalThreadHolder.getUserId() + "」推荐的宠物经验帖子ID列表: " + recommendItems);
-        // “冷启动”
+        // 内容推荐失败时继续使用现有热门浏览回退。
         if (recommendItems.isEmpty()) {
             List<ScoreVO> scoreVOList = activeNetMapper.queryAllIds(
                     "PET-POST",
@@ -169,10 +166,10 @@ public class PetPostServiceImpl extends ServiceImpl<PetPostMapper, PetPost> impl
             List<Integer> petNetIds = scoreVOList.stream()
                     .map(ScoreVO::getContentId)
                     .collect(Collectors.toList());
-            List<PetPostListItemVO> petListItemVOS = this.baseMapper.queryListItemByIds(petNetIds);
+            List<PetPostListItemVO> petListItemVOS = filterAuditedPosts(this.baseMapper.queryListItemByIds(petNetIds), count);
             return ApiResult.success(petListItemVOS);
         }
-        List<PetPostListItemVO> petListItemVOS = this.baseMapper.queryListItemByIds(recommendItems);
+        List<PetPostListItemVO> petListItemVOS = filterAuditedPosts(this.baseMapper.queryListItemByIds(recommendItems), count);
         return ApiResult.success(petListItemVOS);
     }
 
@@ -208,5 +205,64 @@ public class PetPostServiceImpl extends ServiceImpl<PetPostMapper, PetPost> impl
     public Result<List<PetPostSelectedVO>> listPetPostSelect() {
         List<PetPostSelectedVO> petPostSelectedVOS = this.baseMapper.querySelectedVO(LocalThreadHolder.getUserId());
         return ApiResult.success(petPostSelectedVOS);
+    }
+
+    /**
+     * 基于帖子内容特征推荐
+     */
+    private List<Integer> buildPetPostContentRecommendations(List<ActiveNet> activeNetList, Integer count) {
+        if (activeNetList == null || activeNetList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 只把已审核帖子纳入候选，避免推荐到后台还没放行的内容。
+        Map<Integer, PetPostRecommendCandidateVO> candidateMap = this.baseMapper.queryRecommendCandidates().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getIsAudit()))
+                .collect(Collectors.toMap(PetPostRecommendCandidateVO::getId, item -> item));
+        Map<Integer, Map<String, Double>> itemVectors = new HashMap<>();
+        candidateMap.forEach((itemId, candidate) -> itemVectors.put(itemId, buildPetPostFeatureVector(candidate)));
+        Map<Integer, Double> interactionWeights = aggregateInteractionWeights(activeNetList);
+        Map<String, Double> userProfile = ContentBasedRecommendUtil.buildUserProfile(itemVectors, interactionWeights);
+        Set<Integer> excludeIds = new HashSet<>(interactionWeights.keySet());
+        return ContentBasedRecommendUtil.rankItems(itemVectors, userProfile, excludeIds, count);
+    }
+
+    /**
+     * 构建帖子内容特征
+     */
+    private Map<String, Double> buildPetPostFeatureVector(PetPostRecommendCandidateVO candidate) {
+        Map<String, Double> vector = new HashMap<>();
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "petType", candidate.getPetTypeId(), 3D);
+        ContentBasedRecommendUtil.addCategoricalFeature(vector, "petTypeName", candidate.getPetTypeName(), 2D);
+        // 标题和摘要权重更高，正文权重稍低，避免长文本完全主导相似度。
+        ContentBasedRecommendUtil.addTextFeatures(vector, "title", candidate.getTitle(), 2.5D);
+        ContentBasedRecommendUtil.addTextFeatures(vector, "summary", candidate.getSummary(), 2D);
+        ContentBasedRecommendUtil.addTextFeatures(vector, "content", candidate.getContent(), 1D);
+        return vector;
+    }
+
+    /**
+     * 聚合帖子交互权重
+     */
+    private Map<Integer, Double> aggregateInteractionWeights(List<ActiveNet> activeNetList) {
+        Map<Integer, Double> weights = new HashMap<>();
+        for (ActiveNet activeNet : activeNetList) {
+            double behaviorWeight = ContentBasedRecommendUtil.behaviorWeight(activeNet.getType());
+            if (behaviorWeight <= 0) {
+                continue;
+            }
+            weights.merge(activeNet.getContentId(), behaviorWeight, Double::sum);
+        }
+        return weights;
+    }
+
+    /**
+     * 过滤未审核帖子，保证推荐结果与前台展示规则一致
+     */
+    private List<PetPostListItemVO> filterAuditedPosts(List<PetPostListItemVO> posts, Integer count) {
+        int limit = count == null || count <= 0 ? posts.size() : count;
+        return posts.stream()
+                .filter(post -> Boolean.TRUE.equals(post.getIsAudit()))
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 }

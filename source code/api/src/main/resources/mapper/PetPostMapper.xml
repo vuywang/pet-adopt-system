@@ -143,6 +143,18 @@
         WHERE pp.user_id = #{userId}
     </select>
 
+    <select id="queryRecommendCandidates" resultType="com.kmbeast.pojo.vo.PetPostRecommendCandidateVO">
+        SELECT pp.id,
+               pp.pet_type_id AS petTypeId,
+               pt.name AS petTypeName,
+               pp.title,
+               pp.summary,
+               pp.content,
+               pp.is_audit AS isAudit
+        FROM pet_post pp
+                 LEFT JOIN pet_type pt ON pt.id = pp.pet_type_id
+    </select>
+
     <resultMap id="PetPostVOMap" type="com.kmbeast.pojo.vo.PetPostVO">
         <!-- 基础字段 -->
         <id column="id" property="id"/>
