@@ -24,7 +24,7 @@
             </div>
         </div>
         <div class="bottom">
-            <div>&copy; 2025年度《手把手带敲系列》之宠物领养系统 - B站「程序员辰星」原创出品</div>
+            <div>&copy; 宠物领养系统</div>
         </div>
     </div>
 </template>

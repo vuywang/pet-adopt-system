@@ -169,7 +169,6 @@
                 <div>
                     <el-button icon="el-icon-back" v-if="active !== 0" type="primary" style="margin-top: 12px;"
                         @click="last">上一步</el-button>
-                    <!-- B站「程序员辰星」原创出品，除此之外全是盗版，盗版毫无保障 -->
                     <el-button icon="el-icon-right" v-if="active !== 2" type="primary" style="margin-top: 12px;"
                         @click="next">下一步</el-button>
                     <el-button icon="el-icon-success" v-if="active === 2" type="primary" style="margin-top: 12px;"

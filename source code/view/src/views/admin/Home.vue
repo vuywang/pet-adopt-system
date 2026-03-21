@@ -40,7 +40,6 @@
 
 <script>
 
-// B站「程序员辰星」原创出品
 import { get } from "@/utils/request"
 import router from "@/router/index";
 import { clearToken, clearRole, clearUserInfo, setUserInfo } from "@/utils/storage"

@@ -5,7 +5,6 @@ import com.kmbeast.exception.BusinessException;
 /**
  * 断言工具类
  *
- * @author B站「程序员辰星」原创出品
  */
 public class AssertUtils {
 

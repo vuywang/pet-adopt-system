@@ -117,7 +117,6 @@ public class PetPostController {
      *
      * @param count 期望拿到的条数
      * @return Result<List < PetPostListItemVO>> 通用返回封装类
-     * @author B站「程序员辰星」原创出品
      */
     @ResponseBody
     @GetMapping(value = "/autoRecommend/{count}")

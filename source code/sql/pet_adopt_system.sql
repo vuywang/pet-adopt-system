@@ -353,7 +353,7 @@ CREATE TABLE `user`  (
 -- ----------------------------
 -- Records of user
 -- ----------------------------
-INSERT INTO `user` VALUES (1, 'admin', 'B站「程序员辰星」原创出品', '14e1b600b1fd579f47433b88e8d85291', '/api/v1.0/pet-adopt-api/file/getFile?fileName=1756105833648Snipaste_2025-05-20_15-13-00.png', '5567643@qq.com', 1, 2, '1990-06-05', '16766666666', '2024-10-19 12:53:05');
+INSERT INTO `user` VALUES (1, 'admin', '管理员', '14e1b600b1fd579f47433b88e8d85291', '/api/v1.0/pet-adopt-api/file/getFile?fileName=1756105833648Snipaste_2025-05-20_15-13-00.png', '5567643@qq.com', 1, 2, '1990-06-05', '16766666666', '2024-10-19 12:53:05');
 INSERT INTO `user` VALUES (59, 'lichunran', '李春然', '14e1b600b1fd579f47433b88e8d85291', '/api/v1.0/pet-adopt-api/file/getFile?fileName=17488801328625.png', '123342@qq.com', 2, 1, '1985-07-11', '17687665323', '2025-05-28 17:54:48');
 INSERT INTO `user` VALUES (60, 'zhouzhiruo', '周芷若', '14e1b600b1fd579f47433b88e8d85291', '/api/v1.0/pet-adopt-api/file/getFile?fileName=17488801271647.png', '23124231@qq.com', 1, 1, '1991-07-11', '16576666666', '2025-05-28 18:06:43');
 INSERT INTO `user` VALUES (61, 'guihua', '桂花', '14e1b600b1fd579f47433b88e8d85291', '/api/v1.0/pet-adopt-api/file/getFile?fileName=17488801204072.png', '14324@qq.com', 2, 1, NULL, NULL, '2025-05-29 14:13:04');

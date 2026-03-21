@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 /**
  * 校验工具类
  *
- * @author B站「程序员辰星」原创出品
  */
 public class ValidationUtils {
     // 邮箱正则表达式
