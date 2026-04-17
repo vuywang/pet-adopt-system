@@ -52,5 +52,29 @@ public class MainController {
         return mainService.petAdoptOrderCount(days);
     }
 
+    @ResponseBody
+    @GetMapping(value = "/adopterGenderDistribution")
+    public Result<List<ChartVO>> adopterGenderDistribution() {
+        return mainService.adopterGenderDistribution();
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/adopterAgeDistribution")
+    public Result<List<ChartVO>> adopterAgeDistribution() {
+        return mainService.adopterAgeDistribution();
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/adoptDurationTrend")
+    public Result<List<ChartVO>> adoptDurationTrend() {
+        return mainService.adoptDurationTrend();
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/petAttractionAdoptionRate")
+    public Result<List<ChartVO>> petAttractionAdoptionRate() {
+        return mainService.petAttractionAdoptionRate();
+    }
+
 }
 

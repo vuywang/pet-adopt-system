@@ -3,6 +3,7 @@ package com.kmbeast.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kmbeast.pojo.dto.PetAdoptOrderQueryDto;
 import com.kmbeast.pojo.entity.PetAdoptOrder;
+import com.kmbeast.pojo.vo.ChartVO;
 import com.kmbeast.pojo.vo.PetAdoptOrderVO;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -29,5 +30,11 @@ public interface PetAdoptOrderMapper extends BaseMapper<PetAdoptOrder> {
      * @return Integer 记录数
      */
     Integer listCount(PetAdoptOrderQueryDto petAdoptOrderQueryDto);
+
+    List<ChartVO> adopterGenderDistribution();
+
+    List<ChartVO> adopterAgeDistribution();
+
+    List<ChartVO> adoptDurationTrend();
 
 }

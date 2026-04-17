@@ -16,5 +16,13 @@ public interface MainService {
 
     Result<List<ChartVO>> petAdoptOrderCount(Integer days);
 
+    Result<List<ChartVO>> adopterGenderDistribution();
+
+    Result<List<ChartVO>> adopterAgeDistribution();
+
+    Result<List<ChartVO>> adoptDurationTrend();
+
+    Result<List<ChartVO>> petAttractionAdoptionRate();
+
 
 }

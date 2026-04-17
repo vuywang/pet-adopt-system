@@ -98,4 +98,24 @@ public class MainServiceImpl implements MainService {
         List<ChartVO> chartVOS = DateUtil.countDatesWithinRange(days, dateTimeList);
         return ApiResult.success(chartVOS);
     }
+
+    @Override
+    public Result<List<ChartVO>> adopterGenderDistribution() {
+        return ApiResult.success(petAdoptOrderMapper.adopterGenderDistribution());
+    }
+
+    @Override
+    public Result<List<ChartVO>> adopterAgeDistribution() {
+        return ApiResult.success(petAdoptOrderMapper.adopterAgeDistribution());
+    }
+
+    @Override
+    public Result<List<ChartVO>> adoptDurationTrend() {
+        return ApiResult.success(petAdoptOrderMapper.adoptDurationTrend());
+    }
+
+    @Override
+    public Result<List<ChartVO>> petAttractionAdoptionRate() {
+        return ApiResult.success(petMapper.petAttractionAdoptionRate());
+    }
 }

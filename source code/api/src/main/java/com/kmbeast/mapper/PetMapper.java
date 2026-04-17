@@ -2,6 +2,7 @@ package com.kmbeast.mapper;
 
 import com.kmbeast.pojo.dto.PetQueryDto;
 import com.kmbeast.pojo.entity.Pet;
+import com.kmbeast.pojo.vo.ChartVO;
 import com.kmbeast.pojo.vo.PetListItemVO;
 import com.kmbeast.pojo.vo.PetRecommendCandidateVO;
 import com.kmbeast.pojo.vo.PetVO;
@@ -71,5 +72,7 @@ public interface PetMapper {
      * @return 候选项列表
      */
     List<PetRecommendCandidateVO> queryRecommendCandidates();
+
+    List<ChartVO> petAttractionAdoptionRate();
 
 }

@@ -2,31 +2,29 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kmbeast.mapper.PetAdoptOrderMapper">
 
-    <!--查询数据总项-->
     <select id="list" resultMap="BaseResultMap">
-
         SELECT
-        pao.id,
-        pao.user_id,
-        pao.pet_id,
-        pao.address_id,
-        pao.detail,
-        pao.status,
-        pao.audit_error_detail,
-        pao.is_again_post,
-        pao.post_number,
-        pao.create_time,
-        u.username,
-        u.avatar,
-        p.name AS pet_name,
-        p.cover,
-        a.addressee,
-        a.concat_phone,
-        a.detail AS detail_address
+            pao.id,
+            pao.user_id,
+            pao.pet_id,
+            pao.address_id,
+            pao.detail,
+            pao.status,
+            pao.audit_error_detail,
+            pao.is_again_post,
+            pao.post_number,
+            pao.create_time,
+            u.username,
+            u.avatar,
+            p.name AS pet_name,
+            p.cover,
+            a.addressee,
+            a.concat_phone,
+            a.detail AS detail_address
         FROM pet_adopt_order pao
-        LEFT JOIN user u ON u.id = pao.user_id
-        LEFT JOIN pet p ON p.id = pao.pet_id
-        LEFT JOIN address a ON a.id = pao.address_id
+            LEFT JOIN user u ON u.id = pao.user_id
+            LEFT JOIN pet p ON p.id = pao.pet_id
+            LEFT JOIN address a ON a.id = pao.address_id
         <where>
             <if test="userId != null">
                 AND pao.user_id = #{userId}
@@ -44,12 +42,9 @@
         <if test="current != null and size != null">
             LIMIT #{current},#{size}
         </if>
-
     </select>
 
-    <!--满足分页条件的数据总项-->
     <select id="listCount" resultType="integer">
-
         SELECT COUNT(*)
         FROM pet_adopt_order pao
         <where>
@@ -66,12 +61,61 @@
                 AND pao.create_time BETWEEN #{startTime} AND #{endTime}
             </if>
         </where>
-
     </select>
 
-    <!-- 通用查询映射结果 -->
+    <select id="adopterGenderDistribution" resultType="com.kmbeast.pojo.vo.ChartVO">
+        SELECT CASE
+                   WHEN u.gender = 1 THEN '女性'
+                   WHEN u.gender = 2 THEN '男性'
+                   ELSE '未知'
+               END AS name,
+               COUNT(*) AS count
+        FROM pet_adopt_order pao
+            LEFT JOIN user u ON u.id = pao.user_id
+        WHERE pao.status IN (2, 4)
+        GROUP BY name
+        ORDER BY FIELD(name, '女性', '男性', '未知')
+    </select>
+
+    <select id="adopterAgeDistribution" resultType="com.kmbeast.pojo.vo.ChartVO">
+        SELECT age_bucket AS name,
+               COUNT(*) AS count
+        FROM (
+            SELECT CASE
+                       WHEN u.birthday IS NULL THEN '未知'
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) &lt;= 22 THEN '22岁及以下'
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) BETWEEN 23 AND 30 THEN '23-30岁'
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) BETWEEN 31 AND 40 THEN '31-40岁'
+                       ELSE '41岁及以上'
+                   END AS age_bucket,
+                   CASE
+                       WHEN u.birthday IS NULL THEN 5
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) &lt;= 22 THEN 1
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) BETWEEN 23 AND 30 THEN 2
+                       WHEN TIMESTAMPDIFF(YEAR, u.birthday, CURDATE()) BETWEEN 31 AND 40 THEN 3
+                       ELSE 4
+                   END AS sort_no
+            FROM pet_adopt_order pao
+                LEFT JOIN user u ON u.id = pao.user_id
+            WHERE pao.status IN (2, 4)
+        ) age_stat
+        GROUP BY age_bucket, sort_no
+        ORDER BY sort_no
+    </select>
+
+    <select id="adoptDurationTrend" resultType="com.kmbeast.pojo.vo.ChartVO">
+        SELECT DATE_FORMAT(pao.create_time, '%Y-%m') AS name,
+               ROUND(AVG(DATEDIFF(pao.create_time, p.create_time)), 1) AS count
+        FROM pet_adopt_order pao
+            LEFT JOIN pet p ON p.id = pao.pet_id
+        WHERE pao.status IN (2, 4)
+          AND p.create_time IS NOT NULL
+          AND pao.create_time &gt;= p.create_time
+        GROUP BY DATE_FORMAT(pao.create_time, '%Y-%m')
+        ORDER BY DATE_FORMAT(pao.create_time, '%Y-%m')
+    </select>
+
     <resultMap id="BaseResultMap" type="com.kmbeast.pojo.vo.PetAdoptOrderVO">
-        <!--订单基本信息-->
         <id column="id" property="id"/>
         <result column="user_id" property="userId"/>
         <result column="detail" property="detail"/>
@@ -82,16 +126,10 @@
         <result column="is_again_post" property="isAgainPost"/>
         <result column="post_number" property="postNumber"/>
         <result column="create_time" property="createTime"/>
-
-        <!--用戶基本信息-->
         <result column="username" property="username"/>
         <result column="avatar" property="avatar"/>
-
-        <!--宠物基本信息-->
         <result column="pet_name" property="petName"/>
         <result column="cover" property="cover"/>
-
-        <!--收货地址信息-->
         <result column="addressee" property="addressee"/>
         <result column="concat_phone" property="concatPhone"/>
         <result column="detail_address" property="detailAddress"/>
