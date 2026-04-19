@@ -3,3 +3,4 @@ target/
 notes/
 scaffold/
 node_modules/
+/.tmp_thesis_extract/
